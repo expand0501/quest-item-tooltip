@@ -1,0 +1,419 @@
+-- Quest Item Tooltip 1.0.0 by Expand
+-- Adds a block to the item tooltip when an active task wants this item:
+--
+--   Needed for tasks:
+--    * Sidorovich (Cordon): bring 3 - you have 1
+--    * Barkeep (Rostok): bring 1, condition at least 80% - you have 0
+--    * Deliver to Wolf (Cordon)
+--
+-- Task types read (all from the game's own task data, nothing is saved by this mod):
+--   fetch       <task_id>_fetch / <task_id>_fetch_count pstor vars (tasks_fetch.script, ~380 GAMMA tasks)
+--   multifetch  required_item_N / optional_item_N lines of the task section (tasks_multifetch.script)
+--   retrieve    status_functor_params of drx_sl_retrieve_item_task_status (DRX storyline)
+--   delivery    pstor table <task_id> = { item_1_sec, target_id } (tasks_delivery.script)
+-- Only tasks the player has actually taken count (db.actor:get_task(id, true)).
+--
+-- Hook: wraps ui_item.build_desc_footer (same way as Crafting Info in Tooltips), so it works for inventory,
+-- stash, trade and loot tooltips. ui_item caches the description per item until a key is released.
+--
+-- Performance: nothing runs per frame. The task -> item index is rebuilt only when a tooltip is built and the
+-- index is older than INDEX_TTL ms (a handful of active tasks). The inventory is counted only for items that
+-- some task wants.
+
+local pairs, type, tostring, tonumber = pairs, type, tostring, tonumber
+local floor = math.floor
+local sfind, ssub, gmatch = string.find, string.sub, string.gmatch
+local tconcat = table.concat
+local time_global = time_global
+
+local TAG = "[QuestItemTooltip]"
+local INDEX_TTL = 1000 -- ms; how old the task index may be when a tooltip is built
+local BULLET = " \149 "  -- cp1251 bullet, same as ui_item.script
+
+-- Used when MCM is missing. Must match quest_item_tooltip_mcm.script.
+local DEFAULTS = {
+	enabled       = true,
+	show_giver    = true,
+	show_level    = true,
+	show_title    = false,
+	show_have     = true,
+	show_optional = true,
+	show_delivery = true,
+	debug         = false,
+}
+
+local cfg = {}
+
+-- Artefact container suffixes accepted by actor_has_fetch_item (tasks_fetch.script)
+local AF_BOX = { "_af_aam", "_af_iam", "_af_aac", "_lead_box" }
+
+-- index[sec] = array of entries:
+--   { tid, kind = "fetch"|"multi"|"retrieve"|"deliver", num, cond, optional, uses, box }
+local index = {}
+local index_time = nil
+local multi_cache = {}  -- task_id -> { req = {...}, opt = {...} } or false (task ini never changes)
+
+local clr = {}          -- colour codes, filled in on_game_start
+
+local function dbg(fmt, ...)
+	if cfg.debug then
+		printf("%s %s", TAG, string.format(fmt, ...))
+	end
+end
+
+------------------------------------------------------------
+-- Settings
+------------------------------------------------------------
+local function load_settings()
+	local mcm = ui_mcm and ui_mcm.get
+	for k, def in pairs(DEFAULTS) do
+		local v = nil
+		if mcm then
+			v = mcm("quest_item_tooltip/" .. k)
+		end
+		if v == nil then v = def end
+		cfg[k] = v
+	end
+	index_time = nil
+end
+
+------------------------------------------------------------
+-- Task data
+------------------------------------------------------------
+local function add(idx, sec, e)
+	local l = idx[sec]
+	if not l then
+		l = {}
+		idx[sec] = l
+	end
+	l[#l + 1] = e
+end
+
+local function read_multi(ini, tid)
+	local c = multi_cache[tid]
+	if c ~= nil then return c end
+	c = false
+	if ini:line_exist(tid, "required_item_1") then
+		c = { req = {}, opt = {} }
+		for _, kind in pairs({ "required", "optional" }) do
+			local list = (kind == "required") and c.req or c.opt
+			local i = 1
+			while true do
+				local key = kind .. "_item_" .. i
+				local sec = ini:line_exist(tid, key) and ini:r_string_ex(tid, key)
+				if not sec then break end
+				list[#list + 1] = {
+					sec  = sec,
+					num  = tonumber(ini:r_string_ex(tid, key .. "_num")) or 1,
+					cond = tonumber(ini:r_string_ex(tid, key .. "_cond")),
+				}
+				i = i + 1
+			end
+		end
+	end
+	multi_cache[tid] = c
+	return c
+end
+
+local function rebuild_index(actor)
+	local idx = {}
+	index = idx
+	index_time = time_global()
+
+	local tm = task_manager and task_manager.get_task_manager and task_manager.get_task_manager()
+	local task_info = tm and tm.task_info
+	local ini = task_manager and task_manager.task_ini
+	if not (task_info and ini) then
+		dbg("no task manager")
+		return
+	end
+	local sys = ini_sys
+	local n_all, n_active, n_items = 0, 0, 0
+
+	for tid, tsk in pairs(task_info) do
+		n_all = n_all + 1
+		-- Only tasks that are really in progress (finished repeatable tasks stay in task_info).
+		-- tsk is a luabind class instance (CGeneralTask): type() says "userdata", not "table".
+		if type(tid) == "string" and tsk and actor:get_task(tid, true) ~= nil then
+			n_active = n_active + 1
+			local status_f = ini:r_string_ex(tid, "status_functor")
+
+			-- Fetch: section name in <tid>_fetch (a number there = DRX money task, skipped)
+			local fsec = load_var(actor, tid .. "_fetch")
+			if type(fsec) == "string" and status_f ~= "drx_sl_money_task_status" and sys:section_exist(fsec) then
+				local num = tonumber(load_var(actor, tid .. "_fetch_count")) or 1
+				local cond = nil
+				if status_f == "actor_has_fetch_weapon_warfare" then
+					cond = 0.6
+				end
+				add(idx, fsec, { tid = tid, tsk = tsk, kind = "fetch", num = num, cond = cond, uses = true, box = true })
+			end
+
+			-- Multifetch: item list from the task section
+			local m = read_multi(ini, tid)
+			if m then
+				for i = 1, #m.req do
+					local it = m.req[i]
+					add(idx, it.sec, { tid = tid, tsk = tsk, kind = "multi", num = it.num, cond = it.cond })
+				end
+				if cfg.show_optional then
+					for i = 1, #m.opt do
+						local it = m.opt[i]
+						add(idx, it.sec, { tid = tid, tsk = tsk, kind = "multi", num = it.num, cond = it.cond, optional = true })
+					end
+				end
+			end
+
+			-- DRX storyline: retrieve item(s), one of each
+			if status_f == "drx_sl_retrieve_item_task_status" then
+				local params = ini:r_string_ex(tid, "status_functor_params")
+				if params then
+					for s in gmatch(params, "[^,%s]+") do
+						if sys:section_exist(s) then
+							add(idx, s, { tid = tid, tsk = tsk, kind = "retrieve", num = 1 })
+						end
+					end
+				end
+			end
+
+			-- Delivery: package given by the task, goes to target_id
+			if cfg.show_delivery then
+				local d = load_var(actor, tid)
+				if type(d) == "table" and type(d.item_1_sec) == "string" and d.target_id then
+					add(idx, d.item_1_sec, { tid = tid, tsk = tsk, kind = "deliver", target = tonumber(d.target_id) })
+				end
+			end
+		end
+	end
+	if cfg.debug then
+		local parts = {}
+		for sec, l in pairs(idx) do
+			for i = 1, #l do
+				n_items = n_items + 1
+				parts[#parts + 1] = sec .. "<-" .. l[i].tid .. "(" .. l[i].kind .. ")"
+			end
+		end
+		dbg("index rebuilt: %s tasks, %s active, %s wanted items: %s", n_all, n_active, n_items, tconcat(parts, ", "))
+	end
+end
+
+------------------------------------------------------------
+-- Names and places
+------------------------------------------------------------
+local function level_of(se)
+	local gg = game_graph and game_graph()
+	local sim = alife()
+	local gvid = se.m_game_vertex_id
+	if not (gg and sim and gvid and gg:valid_vertex_id(gvid)) then return nil end
+	local v = gg:vertex(gvid)
+	local lname = v and sim:level_name(v:level_id())
+	return lname and game.translate_string(lname) or nil
+end
+
+local function name_of(id, se)
+	local obj = level.object_by_id(id)
+	local n = nil
+	if obj and obj.character_name then
+		n = obj:character_name()
+	elseif se and se.character_name then
+		n = se:character_name()
+	end
+	if n and n ~= "" then
+		return game.translate_string(n)
+	end
+	return nil
+end
+
+-- Who to bring the item to: the warfare return target, then the giver, then the story NPC from the task id.
+local function giver_se(e)
+	local sim = alife()
+	if not sim then return nil, nil end
+	local id = e.target
+	if not id and e.kind ~= "deliver" then
+		id = tonumber(load_var(db.actor, e.tid .. "_target_id")) or tonumber(e.tsk.task_giver_id)
+	end
+	local se = id and sim:object(id)
+	if not se and e.kind ~= "deliver" then
+		local p = sfind(e.tid, "_task", 1, true)
+		local story_id = p and ssub(e.tid, 1, p - 1)
+		se = story_id and get_story_se_object and get_story_se_object(story_id)
+		id = se and se.id
+	end
+	return se, id
+end
+
+local function title_of(e)
+	local t = e.tsk.current_title or e.tsk.title
+	if type(t) ~= "string" or t == "" then return nil end
+	return game.translate_string(t)
+end
+
+------------------------------------------------------------
+-- Counting
+------------------------------------------------------------
+local function count_have(actor, sec, mincond, uses)
+	local n = 0
+	local multi = uses and IsItem and IsItem("multiuse", sec)
+	actor:iterate_inventory(function(_, item)
+		if item:section() == sec and ((not mincond) or item:condition() >= mincond) then
+			if multi then
+				local u = item:get_remaining_uses() or 1
+				n = n + (u > 0 and u or 1)
+			else
+				n = n + 1
+			end
+		end
+	end, actor)
+	return n
+end
+
+------------------------------------------------------------
+-- Tooltip text
+------------------------------------------------------------
+local gc = game.translate_string
+
+local function entry_line(actor, sec, e)
+	local parts = {}
+	local head = {}
+
+	if cfg.show_title then
+		local t = title_of(e)
+		if t then head[#head + 1] = t end
+	end
+
+	local se, id = nil, nil
+	if cfg.show_giver or cfg.show_level then
+		se, id = giver_se(e)
+	end
+	local who = nil
+	if cfg.show_giver and id then
+		who = name_of(id, se)
+	end
+	local lvl = cfg.show_level and se and level_of(se) or nil
+
+	if e.kind == "deliver" then
+		local s = gc("st_qit_deliver")
+		if who then s = s .. " " .. who end
+		if lvl then s = s .. " (" .. lvl .. ")" end
+		head[#head + 1] = s
+		return BULLET .. clr.text .. tconcat(head, " - ")
+	end
+
+	if who then
+		head[#head + 1] = lvl and (who .. " (" .. lvl .. ")") or who
+	elseif lvl then
+		head[#head + 1] = lvl
+	end
+
+	parts[#parts + 1] = clr.text
+	if #head > 0 then
+		parts[#parts + 1] = tconcat(head, " - ") .. ": "
+	end
+	parts[#parts + 1] = gc("st_qit_bring") .. " " .. clr.num .. tostring(e.num) .. clr.text
+	if e.cond then
+		parts[#parts + 1] = ", " .. gc("st_qit_cond") .. " " .. tostring(floor(e.cond * 100 + 0.5)) .. "%"
+	end
+	if e.optional then
+		parts[#parts + 1] = " (" .. gc("st_qit_optional") .. ")"
+	end
+	if cfg.show_have then
+		local have = count_have(actor, sec, e.cond, e.uses)
+		local c = (have >= e.num) and clr.ok or ((have > 0) and clr.part or clr.none)
+		parts[#parts + 1] = " - " .. gc("st_qit_have") .. " " .. c .. tostring(have)
+	end
+	return BULLET .. tconcat(parts)
+end
+
+local function quest_block(sec)
+	if not cfg.enabled or type(sec) ~= "string" then return nil end
+	local actor = db.actor
+	if not (actor and actor:alive()) then return nil end
+
+	local now = time_global()
+	if (not index_time) or (now - index_time > INDEX_TTL) or (now < index_time) then
+		rebuild_index(actor)
+	end
+
+	local list = index[sec]
+	local boxed = nil
+	if not list then
+		-- Artefact in a container counts for fetch tasks that want the bare artefact
+		for i = 1, #AF_BOX do
+			local suf = AF_BOX[i]
+			local n = #sec - #suf
+			if n > 0 and ssub(sec, n + 1) == suf then
+				local base = index[ssub(sec, 1, n)]
+				if base then
+					for j = 1, #base do
+						if base[j].box then
+							boxed = boxed or {}
+							boxed[#boxed + 1] = base[j]
+						end
+					end
+				end
+				break
+			end
+		end
+		list = boxed
+	end
+	if not list then return nil end
+
+	local lines = { clr.head .. gc("st_qit_header") }
+	for i = 1, #list do
+		lines[#lines + 1] = entry_line(actor, sec, list[i])
+	end
+	return tconcat(lines, " \\n") .. " \\n"
+end
+
+------------------------------------------------------------
+-- Hook
+------------------------------------------------------------
+local base_footer = nil
+
+local function footer(obj, sec, str, ...)
+	local res = base_footer(obj, sec, str, ...)
+	if type(res) ~= "string" then return res end
+	local block = quest_block(sec)
+	if block then
+		return res .. block
+	end
+	return res
+end
+
+local function install_hook()
+	if not (ui_item and type(ui_item.build_desc_footer) == "function") then
+		printf("%s ui_item.build_desc_footer not found, tooltip disabled", TAG)
+		return
+	end
+	if ui_item.build_desc_footer == footer then return end -- already installed
+	base_footer = ui_item.build_desc_footer
+	ui_item.build_desc_footer = footer
+end
+
+------------------------------------------------------------
+-- Callbacks
+------------------------------------------------------------
+local function reset_state()
+	index = {}
+	index_time = nil
+end
+
+local function on_option_change()
+	load_settings()
+end
+
+function on_game_start()
+	local gcol = utils_xml and utils_xml.get_color
+	clr.head = gcol and gcol("d_orange") or "%c[255,238,155,23]"
+	clr.text = gcol and gcol("ui_gray_2") or "%c[255,170,170,170]"
+	clr.num  = gcol and gcol("pda_white") or "%c[255,255,255,255]"
+	clr.ok   = gcol and gcol("d_green") or "%c[255,51,255,102]"
+	clr.part = gcol and gcol("yellow") or "%c[255,255,255,0]"
+	clr.none = gcol and gcol("d_red") or "%c[255,204,0,51]"
+
+	load_settings()
+	install_hook()
+	RegisterScriptCallback("on_option_change", on_option_change)
+	RegisterScriptCallback("on_game_load", reset_state)
+	RegisterScriptCallback("actor_on_net_destroy", reset_state)
+end

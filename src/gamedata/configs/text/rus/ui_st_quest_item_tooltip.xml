@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!-- Quest Item Tooltip 1.0.0 by Expand -->
+<string_table>
+	<string id="st_qit_header">
+		<text>Нужно для заданий:</text>
+	</string>
+	<string id="st_qit_bring">
+		<text>принести</text>
+	</string>
+	<string id="st_qit_have">
+		<text>у вас</text>
+	</string>
+	<string id="st_qit_cond">
+		<text>состояние не ниже</text>
+	</string>
+	<string id="st_qit_optional">
+		<text>по желанию, доплата</text>
+	</string>
+	<string id="st_qit_deliver">
+		<text>Доставить:</text>
+	</string>
+
+	<string id="ui_mcm_menu_quest_item_tooltip">
+		<text>Квестовые предметы в подсказке</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_title">
+		<text>Квестовые предметы в подсказке</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_credits">
+		<text>Quest Item Tooltip 1.0.0, автор Expand. Показывает в подсказке предмета, какое из ваших активных заданий его требует, сколько нужно и на какой локации находится заказчик.</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_enabled">
+		<text>Включить</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_enabled_desc">
+		<text>Добавляет в подсказку предмета блок "Нужно для заданий". Выключите, чтобы полностью скрыть его.</text>
+	</string>
+
+	<string id="ui_mcm_quest_item_tooltip_hdr_show">
+		<text>Что показывать</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_giver">
+		<text>Имя заказчика</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_giver_desc">
+		<text>Показывает имя того, кому нужен предмет (или кому его нужно доставить).</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_level">
+		<text>Локация заказчика</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_level_desc">
+		<text>Показывает локацию, где сейчас находится этот человек, например Кордон. Только название локации, без точного места.</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_title">
+		<text>Название задания</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_title_desc">
+		<text>Также показывает название задания, как в КПК. Подсказка становится длиннее.</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_have">
+		<text>Сколько у вас есть</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_have_desc">
+		<text>Считает, сколько таких предметов у вас в инвентаре (зелёный - хватает, жёлтый - не хватает, красный - нет). Предметы в тайниках не считаются.</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_optional">
+		<text>Дополнительные предметы</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_optional_desc">
+		<text>Некоторые задания на несколько предметов доплачивают за дополнительные предметы. Показывает и их, с пометкой "по желанию".</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_delivery">
+		<text>Посылки для доставки</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_delivery_desc">
+		<text>Для посылок из заданий на доставку показывает, кому и на какую локацию их нужно доставить.</text>
+	</string>
+
+	<string id="ui_mcm_quest_item_tooltip_hdr_compat">
+		<text>Совместимость</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_fix_craft_layout">
+		<text>Исправить раскладку иконок Crafting Info</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_fix_craft_layout_desc">
+		<text>Для мода "Crafting Info in Tooltips" с включёнными иконками: подписи "Используется для крафта / приготовления" ставятся над своими иконками, а иконки не выходят за подсказку (если подсказка не помещается на экран - столбцом рядом с характеристиками). Без этого мода ничего не делает.</text>
+	</string>
+
+	<string id="ui_mcm_quest_item_tooltip_hdr_debug">
+		<text>Отладка</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_debug">
+		<text>Журнал отладки</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_debug_desc">
+		<text>Пишет строки с меткой [QuestItemTooltip] в лог игры. Нужно только для отчётов об ошибках.</text>
+	</string>
+</string_table>

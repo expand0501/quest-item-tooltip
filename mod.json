@@ -1,0 +1,13 @@
+{
+  "name": "Quest Item Tooltip",
+  "version": "1.0.0",
+  "zip": "Quest_Item_Tooltip_by_Expand_{version}",
+  "versionFiles": [
+    "src/README_EN.txt",
+    "src/README_RU.txt",
+    "src/gamedata/scripts/quest_item_tooltip.script",
+    "src/gamedata/configs/text/eng/ui_st_quest_item_tooltip.xml",
+    "src/gamedata/configs/text/rus/ui_st_quest_item_tooltip.xml",
+    "src/gamedata/scripts/quest_item_tooltip_craft_layout.script"
+  ]
+}

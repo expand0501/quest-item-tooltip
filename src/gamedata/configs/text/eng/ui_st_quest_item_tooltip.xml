@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<!-- Quest Item Tooltip 1.0.0 by Expand -->
+<string_table>
+	<string id="st_qit_header">
+		<text>Needed for tasks:</text>
+	</string>
+	<string id="st_qit_bring">
+		<text>bring</text>
+	</string>
+	<string id="st_qit_have">
+		<text>you have</text>
+	</string>
+	<string id="st_qit_cond">
+		<text>condition at least</text>
+	</string>
+	<string id="st_qit_optional">
+		<text>optional, extra pay</text>
+	</string>
+	<string id="st_qit_deliver">
+		<text>Deliver to</text>
+	</string>
+
+	<string id="ui_mcm_menu_quest_item_tooltip">
+		<text>Quest Item Tooltip</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_title">
+		<text>Quest Item Tooltip</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_credits">
+		<text>Quest Item Tooltip 1.0.0 by Expand. Shows in the item tooltip which of your active tasks wants this item, how many, and on which map the task giver is.</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_enabled">
+		<text>Enable</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_enabled_desc">
+		<text>Adds the "Needed for tasks" block to item tooltips. Turn off to hide it completely.</text>
+	</string>
+
+	<string id="ui_mcm_quest_item_tooltip_hdr_show">
+		<text>What to show</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_giver">
+		<text>Task giver name</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_giver_desc">
+		<text>Shows the name of the person who wants the item (or the person to deliver it to).</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_level">
+		<text>Task giver map</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_level_desc">
+		<text>Shows the map where that person is now, e.g. Cordon. Only the map name, not the exact place.</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_title">
+		<text>Task title</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_title_desc">
+		<text>Also shows the task title as it appears in the PDA. Makes the tooltip longer.</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_have">
+		<text>How many you carry</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_have_desc">
+		<text>Counts how many of this item you carry (green = enough, yellow = some, red = none). Items in stashes are not counted.</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_optional">
+		<text>Optional extra items</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_optional_desc">
+		<text>Some tasks with several items also pay for optional extra items. Shows those too, marked as optional.</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_delivery">
+		<text>Delivery packages</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_show_delivery_desc">
+		<text>For packages from delivery tasks, shows whom to deliver them to and on which map.</text>
+	</string>
+
+	<string id="ui_mcm_quest_item_tooltip_hdr_compat">
+		<text>Compatibility</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_fix_craft_layout">
+		<text>Fix Crafting Info icon layout</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_fix_craft_layout_desc">
+		<text>For "Crafting Info in Tooltips" with item icons on: puts the "Used for crafting / cooking" captions above their icons and keeps the icons inside the tooltip (in a column next to the stats when the tooltip is too tall for the screen). No effect without that mod.</text>
+	</string>
+
+	<string id="ui_mcm_quest_item_tooltip_hdr_debug">
+		<text>Debug</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_debug">
+		<text>Debug log</text>
+	</string>
+	<string id="ui_mcm_quest_item_tooltip_debug_desc">
+		<text>Writes lines tagged [QuestItemTooltip] to the game log. Only for bug reports.</text>
+	</string>
+</string_table>

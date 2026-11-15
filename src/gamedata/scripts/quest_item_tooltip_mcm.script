@@ -1,0 +1,26 @@
+-- MCM menu for Quest Item Tooltip by Expand
+-- Defaults must match DEFAULTS in quest_item_tooltip.script (used when MCM is not installed);
+-- fix_craft_layout defaults to true in quest_item_tooltip_craft_layout.script.
+function on_mcm_load()
+	return {
+		id = "quest_item_tooltip", sh = true, gr = {
+			{ id = "title", type = "slide", link = "ui_options_slider_player", text = "ui_mcm_quest_item_tooltip_title", size = {512, 50}, spacing = 20 },
+			{ id = "credits", type = "desc", text = "ui_mcm_quest_item_tooltip_credits" },
+			{ id = "enabled", type = "check", val = 1, def = true },
+
+			{ id = "hdr_show", type = "title", text = "ui_mcm_quest_item_tooltip_hdr_show", align = "l", clr = {255, 200, 200, 200} },
+			{ id = "show_giver", type = "check", val = 1, def = true },
+			{ id = "show_level", type = "check", val = 1, def = true },
+			{ id = "show_title", type = "check", val = 1, def = false },
+			{ id = "show_have", type = "check", val = 1, def = true },
+			{ id = "show_optional", type = "check", val = 1, def = true },
+			{ id = "show_delivery", type = "check", val = 1, def = true },
+
+			{ id = "hdr_compat", type = "title", text = "ui_mcm_quest_item_tooltip_hdr_compat", align = "l", clr = {255, 200, 200, 200} },
+			{ id = "fix_craft_layout", type = "check", val = 1, def = true },
+
+			{ id = "hdr_debug", type = "title", text = "ui_mcm_quest_item_tooltip_hdr_debug", align = "l", clr = {255, 200, 200, 200} },
+			{ id = "debug", type = "check", val = 1, def = false },
+		}
+	}
+end

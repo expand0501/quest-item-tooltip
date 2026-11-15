@@ -1,0 +1,278 @@
+-- Quest Item Tooltip 1.0.0 by Expand - layout fix for "Crafting Info in Tooltips" (Utjan)
+--
+-- Crafting Info (icon mode) puts "Used for crafting / cooking" icons under the description. Two layout bugs:
+--  1. Its caption window gets the height of the whole description, and X-Ray centres text vertically, so the
+--     caption slides down below its icons (the longer the description, the further).
+--  2. When the tooltip gets taller than the screen (768) it calls UIInfoItem:MoveRecipesRightVertical, which puts
+--     the caption on the first stats line, stretches the icon view to the frame height (icons drop below the
+--     tooltip) and cuts the frame back to the description.
+--
+-- Whenever Crafting Info has built new blocks in UIInfoItem:Update (new container objects; does not depend on
+-- catching its AddRecipesContainer call), or another script changed the frame height since, we lay them out
+-- again: caption on its own line (height fitted to its text), icons under it, blocks under the description/stats,
+-- frame fitted. Only when
+-- that is taller than the screen, the blocks go into a column right of the stats (if there is room and it does not
+-- run into ammo/parts blocks under the stats). MoveRecipesRightVertical does nothing while the fix is on.
+--
+-- Nothing runs unless Crafting Info is installed and has built a block for this tooltip. Toggle: MCM
+-- "quest_item_tooltip/fix_craft_layout".
+
+local max, abs = math.max, math.abs
+
+local TAG = "[QuestItemTooltip]"
+local CONTS = { "recipes", "cooking" } -- Crafting Info container names, in its display order
+local GRID_SIZE, GRID_LINE = 35, 5     -- same grid as Crafting Info
+local GAP_X = 8                         -- space between stats and the column
+local GAP_CAP = 2                       -- caption -> icons
+local GAP_BLOCK = 8                     -- between two icon blocks
+local MIN_COL_W = 90                    -- narrower column -> put the blocks under everything
+local CAP_H = 16
+local SCREEN_H = 768                    -- UI height; Crafting Info uses the same limit
+
+local enabled = true
+local debug = false
+local installed = false
+local orig = {}
+
+local function load_settings()
+	local v = ui_mcm and ui_mcm.get and ui_mcm.get("quest_item_tooltip/fix_craft_layout")
+	if v == nil then v = true end
+	enabled = v
+	debug = ui_mcm and ui_mcm.get and ui_mcm.get("quest_item_tooltip/debug") or false
+end
+
+local function bottom_of(w)
+	if not w then return 0 end
+	return w:GetWndPos().y + w:GetHeight()
+end
+
+local function shown(w)
+	return w and w:IsShown()
+end
+
+-- Right edge of the visible stats content (inside the info box), or nil if unknown
+local function stats_right(self)
+	local sd = self.stats_dialog
+	local stats = self.stats
+	if type(stats) ~= "table" then return nil end
+	local sx = sd:GetWndPos().x
+	local right = nil
+	for i = 1, #stats do
+		local s = stats[i]
+		local base = s and s.base
+		if base and base:IsShown() then
+			local bx = sx + base:GetWndPos().x
+			local w = s.cap
+			if w and w:IsShown() then right = max(right or 0, bx + w:GetWndPos().x + w:GetWidth()) end
+			w = s.txt
+			if w and w:IsShown() then right = max(right or 0, bx + w:GetWndPos().x + w:GetWidth()) end
+			w = s.bar1
+			if w and w:IsShown() then right = max(right or 0, bx + w:GetWndPos().x + w:GetWidth()) end
+			w = s.comp
+			if w and w:IsShown() then right = max(right or 0, bx + w:GetWndPos().x + w:GetWidth()) end
+		end
+	end
+	return right
+end
+
+-- Item list Crafting Info built this block from (recorded by add_container), or nil if unknown / stale
+local function tbl_of(self, cont)
+	local t = self.__qit_tbl
+	local f = self.__qit_tbl_cc
+	if t and f and self.CC and f[cont] == self.CC[cont] then
+		return t[cont]
+	end
+	return nil
+end
+
+-- Lays out one Crafting Info block (caption + icon grid) at x, y with width w. The icon grid is rebuilt for width
+-- w only when regrid is set (needs the item list); otherwise it keeps Crafting Info's grid and is only moved.
+-- Returns the bottom y.
+local function place_block(self, cont, x, y, w, regrid)
+	local box = self[cont]
+	local cc = self.CC and self.CC[cont]
+	local cap = self[cont .. "_txt"]
+	if not (box and cc and cc.prof and cc.scroll) then return y end
+
+	if cap then
+		cap:SetWndPos(vector2():set(x, y))
+		cap:SetWndSize(vector2():set(w, CAP_H))
+		cap:SetTextAlignment(0)
+		cap:SetTextComplexMode(true)
+		cap:SetText(cap:GetText()) -- re-wrap for the new width
+		cap:AdjustHeightToText()
+		cap:Show(true)
+		y = y + max(cap:GetHeight(), CAP_H) + GAP_CAP
+	end
+
+	local prof = cc.prof
+	local pp = prof:GetWndPos()
+	box:SetWndPos(vector2():set(x - pp.x, y - pp.y))
+	local tbl = regrid and tbl_of(self, cont)
+	if tbl then
+		prof:SetWndSize(vector2():set(w, GRID_SIZE))
+		utils_xml.sync_size(prof, cc.scroll)
+		cc:SetGridSpecs(GRID_SIZE, GRID_LINE)
+		cc:Reinit(tbl)
+		cc:AdjustHeightToCell()
+	end
+	utils_xml.sync_size(prof, cc.scroll) -- Crafting Info's side layout stretched the view to the frame height
+	local h = prof:GetHeight()
+	box:SetWndSize(vector2():set(pp.x + prof:GetWidth(), pp.y + h))
+	box:Show(true)
+	return y + h
+end
+
+local function place_all(self, list, x, y, w, regrid)
+	for i = 1, #list do
+		if i > 1 then y = y + GAP_BLOCK end
+		y = place_block(self, list[i], x, y, w, regrid)
+	end
+	return y
+end
+
+local function relayout(self)
+	local frame, desc, sd = self.frame, self.desc, self.stats_dialog
+	if not (frame and desc and sd and self.CC) then return nil end
+
+	local list = {}
+	local have_tbl = true
+	for i = 1, #CONTS do
+		local c = CONTS[i]
+		if self.CC[c] and shown(self[c]) then
+			list[#list + 1] = c
+			if not tbl_of(self, c) then have_tbl = false end
+		end
+	end
+	if #list == 0 then return nil end
+
+	-- Left content: description, stats, and blocks below the stats (ammo, parts)
+	local stats_on = sd:IsShown()
+	local sd_pos = sd:GetWndPos()
+	local stats_bottom = stats_on and bottom_of(sd) or 0
+	local left_bottom = max(bottom_of(desc), stats_bottom)
+	local below_bottom = nil -- bottom of full-width blocks under the stats
+	local col_top = sd_pos.y
+	if shown(self.ammo) then
+		below_bottom = bottom_of(self.ammo)
+	end
+	local parts = self.parts
+	if shown(parts) then
+		local pb = bottom_of(parts)
+		if parts:GetWndPos().y >= stats_bottom - 1 then
+			below_bottom = max(below_bottom or 0, pb)
+		else
+			col_top = max(col_top, pb + GAP_BLOCK) -- "Parts in tooltip" moved its block next to the stats
+		end
+		left_bottom = max(left_bottom, pb)
+	end
+	if below_bottom then left_bottom = max(left_bottom, below_bottom) end
+
+	local fw = frame:GetWidth()
+	local dx, dw = desc:GetWndPos().x, desc:GetWidth()
+	local mode = "below"
+	local bottom = place_all(self, list, dx, left_bottom + 10, dw, true)
+
+	if bottom + 10 > SCREEN_H and stats_on and have_tbl then
+		local right = stats_right(self)
+		if right then
+			local col_x = right + GAP_X
+			local col_w = fw - sd_pos.x - col_x
+			if col_w >= MIN_COL_W then
+				local cb = place_all(self, list, col_x, col_top, col_w, true)
+				if below_bottom and cb > stats_bottom then
+					-- would run into ammo/parts under the stats: back to the blocks under everything
+					bottom = place_all(self, list, dx, left_bottom + 10, dw, true)
+				else
+					bottom, mode = cb, "column"
+				end
+			end
+		end
+	end
+
+	local fh = max(left_bottom, bottom) + 10
+	frame:SetWndSize(vector2():set(fw, fh))
+	if debug then
+		printf("%s craft layout: %s, %d block(s), item lists %s, frame height %d", TAG, mode, #list,
+			have_tbl and "known" or "unknown", fh)
+	end
+	return frame:GetHeight()
+end
+
+local function mark_side(self, offset, tbl, cont, ...)
+	if not enabled then
+		return orig.move(self, offset, tbl, cont, ...)
+	end
+end
+
+local function add_container(self, offset, tbl, cont, ...)
+	local a, b, c, d = orig.add(self, offset, tbl, cont, ...)
+	if cont then
+		self.__qit_tbl = self.__qit_tbl or {}
+		self.__qit_tbl_cc = self.__qit_tbl_cc or {}
+		self.__qit_tbl[cont] = tbl
+		self.__qit_tbl_cc[cont] = self.CC and self.CC[cont]
+	end
+	return a, b, c, d
+end
+
+-- After every info box update: lay out again when Crafting Info built new blocks (new container objects), or when
+-- something changed the frame height since our last layout (once per built block, so two scripts can't fight
+-- over the frame every frame). Steady state: a few table lookups and one GetHeight call per Update, no allocations.
+local function update(self, ...)
+	local a, b, c, d = orig.update(self, ...)
+	if not enabled then return a, b, c, d end
+	local ccs = self.CC
+	local r = ccs and ccs.recipes
+	local k = ccs and ccs.cooking
+	if not (r or k) then
+		self.__qit_r, self.__qit_k, self.__qit_fh = nil, nil, nil
+		return a, b, c, d
+	end
+	local frame = self.frame
+	if not frame then return a, b, c, d end
+	local fresh = (r ~= self.__qit_r) or (k ~= self.__qit_k)
+	local fh = self.__qit_fh
+	if fresh or not fh then
+		self.__qit_r, self.__qit_k, self.__qit_healed = r, k, nil
+		self.__qit_fh = relayout(self) or frame:GetHeight() -- nothing to place: don't retry every frame
+	elseif (not self.__qit_healed) and abs(frame:GetHeight() - fh) > 0.5 then
+		-- another script resized the frame after us: lay out once more, at most once per built block
+		self.__qit_healed = true
+		if debug then
+			printf("%s craft layout: frame height changed by another script (%d -> %d), layout again", TAG,
+				fh, frame:GetHeight())
+		end
+		self.__qit_fh = relayout(self) or frame:GetHeight()
+	end
+	return a, b, c, d
+end
+
+local function install()
+	if installed then return end
+	installed = true -- try once per game start
+	local cls = utils_ui and utils_ui.UIInfoItem
+	if not cls then return end
+	local move, add, upd = cls.MoveRecipesRightVertical, cls.AddRecipesContainer, cls.Update
+	if type(move) ~= "function" or type(add) ~= "function" or type(upd) ~= "function" then
+		return -- Crafting Info in Tooltips not installed
+	end
+	if move == mark_side then return end
+	orig.move, orig.add, orig.update = move, add, upd
+	cls.MoveRecipesRightVertical = mark_side
+	cls.AddRecipesContainer = add_container
+	cls.Update = update
+	printf("%s Crafting Info layout fix installed", TAG)
+end
+
+local function on_first_update()
+	-- All scripts (Crafting Info is zzz_*) are loaded by now
+	install()
+	UnregisterScriptCallback("actor_on_first_update", on_first_update)
+end
+
+function on_game_start()
+	load_settings()
+	RegisterScriptCallback("on_option_change", load_settings)
+	RegisterScriptCallback("actor_on_first_update", on_first_update)
+end
