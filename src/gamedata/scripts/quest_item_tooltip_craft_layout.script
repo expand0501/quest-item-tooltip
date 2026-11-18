@@ -1,4 +1,4 @@
--- Quest Item Tooltip 1.0.0 by Expand - layout fix for "Crafting Info in Tooltips" (Utjan)
+-- Quest Item Tooltip 1.0.2 by Expand - layout fix for "Crafting Info in Tooltips" (Utjan)
 --
 -- Crafting Info (icon mode) puts "Used for crafting / cooking" icons under the description. Two layout bugs:
 --  1. Its caption window gets the height of the whole description, and X-Ray centres text vertically, so the
@@ -18,6 +18,7 @@
 -- "quest_item_tooltip/fix_craft_layout".
 
 local max, abs = math.max, math.abs
+local rawequal = rawequal -- luabind UI classes have no __eq: "==" between two of them is a Lua error
 
 local TAG = "[QuestItemTooltip]"
 local CONTS = { "recipes", "cooking" } -- Crafting Info container names, in its display order
@@ -79,7 +80,7 @@ end
 local function tbl_of(self, cont)
 	local t = self.__qit_tbl
 	local f = self.__qit_tbl_cc
-	if t and f and self.CC and f[cont] == self.CC[cont] then
+	if t and f and self.CC and rawequal(f[cont], self.CC[cont]) then
 		return t[cont]
 	end
 	return nil
@@ -203,9 +204,56 @@ local function mark_side(self, offset, tbl, cont, ...)
 	if not enabled then
 		return orig.move(self, offset, tbl, cont, ...)
 	end
+	-- Crafting Info calls Sync_Finale(true, nil, <desc>, frame) right after this, which cuts the frame to the
+	-- description. sync_finale below turns that one call into "fit the frame to all shown content".
+	self.__qit_cut = true
+end
+
+-- Fits the frame to the lowest shown block (+ offset)
+local function fit_frame(self, offset)
+	local frame = self.frame
+	if not frame then return end
+	local bottom = bottom_of(self.desc)
+	if shown(self.stats_dialog) then bottom = max(bottom, bottom_of(self.stats_dialog)) end
+	local list = { self.ammo, self.parts, self.recipes, self.cooking }
+	for i = 1, 4 do
+		if shown(list[i]) then bottom = max(bottom, bottom_of(list[i])) end
+	end
+	frame:SetWndSize(vector2():set(frame:GetWidth(), bottom + (offset or 10)))
+end
+
+local function sync_finale(self, cond, syncer, resizer, adapter, offset, ...)
+	if self.__qit_cut then
+		self.__qit_cut = nil
+		if enabled and cond and not syncer and adapter and rawequal(adapter, self.frame) then
+			fit_frame(self, offset)
+			self:Show(true)
+			return true
+		end
+	end
+	return orig.sync_finale(self, cond, syncer, resizer, adapter, offset, ...)
+end
+
+-- Caption of a block under the description: Crafting Info gives the caption window the height of the whole
+-- description and X-Ray centres the text vertically, so it slides below its icons. Keep the window one line high
+-- (top aligned). Works without our Update wrapper (other mods may replace Update after us).
+local function sync_text(self, vertical, cont, ...)
+	local a, b = orig.sync_text(self, vertical, cont, ...)
+	if enabled and not vertical then
+		local cap = self[cont .. "_txt"]
+		if cap then
+			cap:SetWndSize(vector2():set(cap:GetWidth(), CAP_H))
+			cap:SetTextAlignment(0)
+			cap:SetTextComplexMode(true)
+			cap:SetText(cap:GetText())
+			cap:AdjustHeightToText()
+		end
+	end
+	return a, b
 end
 
 local function add_container(self, offset, tbl, cont, ...)
+	self.__qit_cut = nil
 	local a, b, c, d = orig.add(self, offset, tbl, cont, ...)
 	if cont then
 		self.__qit_tbl = self.__qit_tbl or {}
@@ -231,7 +279,7 @@ local function update(self, ...)
 	end
 	local frame = self.frame
 	if not frame then return a, b, c, d end
-	local fresh = (r ~= self.__qit_r) or (k ~= self.__qit_k)
+	local fresh = not (rawequal(r, self.__qit_r) and rawequal(k, self.__qit_k))
 	local fh = self.__qit_fh
 	if fresh or not fh then
 		self.__qit_r, self.__qit_k, self.__qit_healed = r, k, nil
@@ -254,11 +302,16 @@ local function install()
 	local cls = utils_ui and utils_ui.UIInfoItem
 	if not cls then return end
 	local move, add, upd = cls.MoveRecipesRightVertical, cls.AddRecipesContainer, cls.Update
-	if type(move) ~= "function" or type(add) ~= "function" or type(upd) ~= "function" then
+	local txt, fin = cls.SyncRecipesText, cls.Sync_Finale
+	if type(move) ~= "function" or type(add) ~= "function" or type(upd) ~= "function"
+		or type(txt) ~= "function" or type(fin) ~= "function" then
 		return -- Crafting Info in Tooltips not installed
 	end
 	if move == mark_side then return end
 	orig.move, orig.add, orig.update = move, add, upd
+	orig.sync_text, orig.sync_finale = txt, fin
+	cls.SyncRecipesText = sync_text
+	cls.Sync_Finale = sync_finale
 	cls.MoveRecipesRightVertical = mark_side
 	cls.AddRecipesContainer = add_container
 	cls.Update = update

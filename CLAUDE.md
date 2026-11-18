@@ -24,6 +24,17 @@ is (map name only, no exact position). Shipped readmes: `src/README_EN.txt`, `sr
   `self.CC.recipes/cooking` objects (identity, not our add wrapper) and once per built block when the frame height
   changed after us; below-layout only moves the grid. Debug log lines `craft layout: ...` show what happened.
   0.1.4 tested in game by Expand (2026-11-15) and released unchanged as 1.0.0.
+  1.0.1 (2026-11-17, profile `v31.1 - radiation rework`): caption was below its icons again (Zuda, screenshot).
+  Cause (from code, not yet confirmed in game): DOGMA weapon tooltips (`zzzz_dogma_gui_weapon_tooltips_main`, active)
+  re-installs its own `UIInfoItem.Update`/`Show` on top in `actor_on_update` ("reclaim"), dropping our Update wrapper.
+  Never fight that (recursion). Hooks that survive: `SyncRecipesText` (caption one line high, top aligned) and
+  `Sync_Finale` (the frame cut after our no-op `MoveRecipesRightVertical` becomes "fit frame to all content").
+  Column mode needs the Update wrapper, so with DOGMA tall tooltips show icons under the stats. The winning
+  Crafting Info copy in this profile is `UI Rework G.A.M.M.A. Style` (offsets 30, same method names).
+  1.0.2 (2026-11-18): crash `No such operator [__eq] defined in class [UICellContainer]` at `update` (released as
+  1.0.0 line 234). Lua-defined luabind classes (`UICellContainer`, `UIInfoItem` widgets) have no `__eq`: `==`/`~=`
+  between two different instances of the same class is a Lua error (nil vs object is fine, same object is fine).
+  **Always compare UI objects with `rawequal`.** Not yet confirmed in game.
 - `src/gamedata/configs/text/{eng,rus}/ui_st_quest_item_tooltip.xml`: tooltip words (`st_qit_*`) + MCM strings
   (rus = Windows-1251).
 

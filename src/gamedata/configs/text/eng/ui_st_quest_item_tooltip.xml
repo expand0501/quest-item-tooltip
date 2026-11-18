@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="windows-1251"?>
-<!-- Quest Item Tooltip 1.0.0 by Expand -->
+<!-- Quest Item Tooltip 1.0.2 by Expand -->
 <string_table>
 	<string id="st_qit_header">
 		<text>Needed for tasks:</text>
@@ -27,7 +27,7 @@
 		<text>Quest Item Tooltip</text>
 	</string>
 	<string id="ui_mcm_quest_item_tooltip_credits">
-		<text>Quest Item Tooltip 1.0.0 by Expand. Shows in the item tooltip which of your active tasks wants this item, how many, and on which map the task giver is.</text>
+		<text>Quest Item Tooltip 1.0.2 by Expand. Shows in the item tooltip which of your active tasks wants this item, how many, and on which map the task giver is.</text>
 	</string>
 	<string id="ui_mcm_quest_item_tooltip_enabled">
 		<text>Enable</text>

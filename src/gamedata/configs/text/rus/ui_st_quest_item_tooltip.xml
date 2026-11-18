@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="windows-1251"?>
-<!-- Quest Item Tooltip 1.0.0 by Expand -->
+<!-- Quest Item Tooltip 1.0.2 by Expand -->
 <string_table>
 	<string id="st_qit_header">
 		<text>Нужно для заданий:</text>
@@ -27,7 +27,7 @@
 		<text>Квестовые предметы в подсказке</text>
 	</string>
 	<string id="ui_mcm_quest_item_tooltip_credits">
-		<text>Quest Item Tooltip 1.0.0, автор Expand. Показывает в подсказке предмета, какое из ваших активных заданий его требует, сколько нужно и на какой локации находится заказчик.</text>
+		<text>Quest Item Tooltip 1.0.2, автор Expand. Показывает в подсказке предмета, какое из ваших активных заданий его требует, сколько нужно и на какой локации находится заказчик.</text>
 	</string>
 	<string id="ui_mcm_quest_item_tooltip_enabled">
 		<text>Включить</text>
