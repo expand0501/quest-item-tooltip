@@ -1,4 +1,4 @@
-Quest Item Tooltip 1.0.2 by Expand
+Quest Item Tooltip 1.0.3 by Expand
 For S.T.A.L.K.E.R. Anomaly / G.A.M.M.A.
 
 WHAT IT DOES
@@ -52,6 +52,7 @@ Nothing runs every frame. The list of wanted items is read from your active task
 is built (at most once per second), and your inventory is counted only for items a task wants.
 
 VERSION HISTORY
+1.0.3 - Crafting Info captions stay above their icons when DOGMA weapon tooltips moves the icon blocks (caption was drawn over the icons).
 1.0.2 - Fixed a crash when opening item tooltips with Crafting Info in Tooltips installed ("No such operator [__eq] defined in class [UICellContainer]").
 1.0.1 - Crafting Info captions no longer slide below their icons when DOGMA weapon tooltips is installed.
 1.0.0 - first public release (same as 0.1.4).

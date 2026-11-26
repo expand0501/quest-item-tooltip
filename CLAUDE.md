@@ -81,6 +81,35 @@ In `mod.json`, both readme titles + history, main script header, both text files
   in Tooltips all enabled. `Job_to_Done_-_Redone_ver._1.9.1` (only in `v31.1 - radiation rework`) changes one nil
   check in `task_manager.script`, no effect here.
 
+## Tests
+In-game suite `run.ps1 -Suite qit` (13 scenarios, one launch): plan, method and what stays manual in `tests.md`.
+First run 2026-11-26 (1.0.2 installed zip, profile `Claude Test`, save `claude_test`, run ids `20261126-205154` +
+`-205257`; launches made by the coordinating session with Expand's OK): 11 PASS, `delivery` UNCLEAR (no far story NPC
+found, runner widened), `craft_layout` FAIL = real layout bug with DOGMA (below); reproduced identically in the rerun
+`20261126-210512`. No Lua errors from the mod; the
+1.0.2 `__eq` path (4 info-box updates in a row with new containers) ran without error.
+
+## Open bug: Crafting Info caption over its icons when DOGMA weapon tooltips is active (found 2026-11-26)
+- **Seen** (autotest `craft_layout`, real `UIInfoItem` with Crafting Info icons): caption `recipes_txt` at y 267 while
+  its icon grid spans 217-497 (prt_i_copper) and 201 vs 189-389 (prt_i_transistors): the caption sits inside the icons.
+  Third item: caption 173, grid 189 (box 173 + prof offset 16) = correct. Caption and box are both children of
+  `self.dialog` (same parent; **verified** in `zzz_craft_use_in_tooltip_mcm.script` `__init`).
+- **Cause (verified in code, consistent with the numbers)**: DOGMA (`zzzz_dogma_gui_weapon_tooltips_main.script`,
+  `F.layout_stack`) runs after Crafting Info on every new item (`uiinfo_update_hook`) and on every `Show(true)`
+  (`uiinfo_show_hook`; Crafting Info's Update ends with `self:Show(true)`). It restacks `info.recipes` / `info.cooking`
+  with `info:Sync_Y(tail, wnd, gap)` but never moves `recipes_txt` / `cooking_txt`. Crafting Info places the caption at
+  the box's y (`SyncRecipesText`), so after DOGMA moves the box the caption stays at the old y. Correct only when
+  DOGMA's stack position equals Crafting Info's. Our `SyncRecipesText` hook (caption one line high) can't help: it
+  runs before DOGMA. Explains the 1.0.1 report (Zuda caption below icons) better than "DOGMA drops our Update wrapper"
+  alone. Not a bug in our code; a gap in the fix.
+- **Fix in 1.0.3 (built 2026-11-26, confirmed working in game by Expand 2026-11-26, released)**: `sync_y` wraps `UIInfoItem.Sync_Y` in
+  `quest_item_tooltip_craft_layout.script` (installed with the other hooks): after the original,
+  when `rawequal(child, self.recipes)` / `self.cooking`, the fix is on and the caption is shown, move
+  `self[cont .. "_txt"]` to `(its x, child's new y)`. DOGMA calls `info:Sync_Y` (class lookup at call time, DOGMA never reclaims `Sync_Y`), and
+  Crafting Info's own `Sync_Finale` uses `Sync_Y` too, so both stackers keep the caption with its box. Cheap (two
+  rawequal checks per call). Regression check: `craft_layout` (`caption_above_*`); the runner now logs box y and prof
+  offset per round.
+
 ## Open items
 - Not covered yet: other GAMMA task types with item requirements (intercept artefact, urgent orders, NTA stash,
   `special_steps_for_lostzone_tasks` psy helmet / Jupiter documents, story quests driven by dialogs/infoportions).

@@ -1,4 +1,4 @@
--- Quest Item Tooltip 1.0.2 by Expand - layout fix for "Crafting Info in Tooltips" (Utjan)
+-- Quest Item Tooltip 1.0.3 by Expand - layout fix for "Crafting Info in Tooltips" (Utjan)
 --
 -- Crafting Info (icon mode) puts "Used for crafting / cooking" icons under the description. Two layout bugs:
 --  1. Its caption window gets the height of the whole description, and X-Ray centres text vertically, so the
@@ -13,6 +13,8 @@
 -- frame fitted. Only when
 -- that is taller than the screen, the blocks go into a column right of the stats (if there is room and it does not
 -- run into ammo/parts blocks under the stats). MoveRecipesRightVertical does nothing while the fix is on.
+-- When another mod moves an icon block with Sync_Y (DOGMA weapon tooltips restacks the box after Crafting Info), its
+-- caption moves with it.
 --
 -- Nothing runs unless Crafting Info is installed and has built a block for this tooltip. Toggle: MCM
 -- "quest_item_tooltip/fix_craft_layout".
@@ -252,6 +254,26 @@ local function sync_text(self, vertical, cont, ...)
 	return a, b
 end
 
+-- Another tooltip mod (DOGMA weapon tooltips) restacks the info box after Crafting Info and moves the icon blocks with
+-- Sync_Y, but not their captions: the caption stays where Crafting Info put it, often on top of the icons. Keep the
+-- caption on the block's top edge (where SyncRecipesText puts it; the icon grid starts below it inside the block).
+local function sync_y(self, parent, child, offset, ...)
+	local a, b = orig.sync_y(self, parent, child, offset, ...)
+	if enabled and child then
+		for i = 1, #CONTS do
+			local c = CONTS[i]
+			if rawequal(child, self[c]) then
+				local cap = self[c .. "_txt"]
+				if cap and cap:IsShown() then
+					cap:SetWndPos(vector2():set(cap:GetWndPos().x, child:GetWndPos().y))
+				end
+				break
+			end
+		end
+	end
+	return a, b
+end
+
 local function add_container(self, offset, tbl, cont, ...)
 	self.__qit_cut = nil
 	local a, b, c, d = orig.add(self, offset, tbl, cont, ...)
@@ -315,6 +337,10 @@ local function install()
 	cls.MoveRecipesRightVertical = mark_side
 	cls.AddRecipesContainer = add_container
 	cls.Update = update
+	if type(cls.Sync_Y) == "function" and cls.Sync_Y ~= sync_y then
+		orig.sync_y = cls.Sync_Y
+		cls.Sync_Y = sync_y
+	end
 	printf("%s Crafting Info layout fix installed", TAG)
 end
 

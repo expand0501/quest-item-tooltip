@@ -1,5 +1,8 @@
 # Changelog - Quest Item Tooltip by Expand
 
+- 1.0.3: Crafting Info caption drawn over its icons when DOGMA weapon tooltips is installed. DOGMA restacks the
+  info box after Crafting Info and moves the icon blocks with `UIInfoItem:Sync_Y`, but not their captions. The layout
+  fix now wraps `Sync_Y` and moves the caption with its block (found by the in-game autotest `craft_layout`, 2026-11-26).
 - 1.0.2: fix crash "No such operator [__eq] defined in class [UICellContainer]" in the Crafting Info layout
   fix (`UIInfoItem:Update`). Lua-defined luabind classes have no `__eq`, so `==`/`~=` between two different
   container objects is a Lua error. The "new containers?" check, the item-list check and the `Sync_Finale` frame check
